@@ -34,7 +34,7 @@ Since this project uses only standard web technologies, no build step is require
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-username/tetris-js.git
+    git clone https://github.com/bethelhem/tetris-js.git
     ```
 2.  **Open the game**:
     *   Simply double-click `index.html` to open it in your default browser.
@@ -71,5 +71,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-*Built with ❤️ by [Your Name]*
+*Built with ❤️ by [bethelhem-dev]*
 #
+
