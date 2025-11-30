@@ -31,7 +31,7 @@ const player = {
 };
 
 let dropCounter = 0;
-let dropInterval = 1000;
+let dropInterval = 800;
 let lastTime = 0;
 let isPaused = false;
 let isGameOver = false;
@@ -96,22 +96,159 @@ function drawMatrix(matrix, offset, ctx) {
     matrix.forEach((row, y) => {
         row.forEach((value, x) => {
             if (value !== 0) {
-                // Draw main block
-                ctx.fillStyle = colors[value];
-                ctx.fillRect(x + offset.x, y + offset.y, 1, 1);
-                
-                // Add a slight inner glow/highlight for 3D effect
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.fillRect(x + offset.x + 0.1, y + offset.y + 0.1, 0.8, 0.8);
+                const color = colors[value];
+                const px = x + offset.x;
+                const py = y + offset.y;
 
-                // Add border/outline
-                ctx.lineWidth = 0.05;
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-                ctx.strokeRect(x + offset.x, y + offset.y, 1, 1);
+                // 1. Strong Outer Glow
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = color;
+
+                // 2. Main Block Fill (Slightly transparent for glass effect)
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.9;
+                ctx.fillRect(px, py, 1, 1);
+                ctx.globalAlpha = 1.0;
+
+                // 3. Inner Highlight (Top-Left) for 3D/Glass look
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fillRect(px, py, 1, 0.1); // Top edge
+                ctx.fillRect(px, py, 0.1, 1); // Left edge
+                
+                // 4. Inner Shadow (Bottom-Right)
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(px, py + 0.9, 1, 0.1); // Bottom edge
+                ctx.fillRect(px + 0.9, py, 0.1, 1); // Right edge
+
+                // Reset shadow
+                ctx.shadowBlur = 0;
             }
         });
     });
 }
+
+// ... (keep existing game logic) ...
+
+// Background Animation (Synthwave Grid + Falling Particles)
+const bgCanvas = document.getElementById('bg-canvas');
+const bgContext = bgCanvas.getContext('2d');
+
+function resizeBg() {
+    bgCanvas.width = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeBg);
+resizeBg();
+
+// Falling Pieces Logic
+const bgPieces = [];
+const bgPieceTypes = 'ILJOTSZ';
+
+class BgPiece {
+    constructor() {
+        this.reset();
+        this.y = Math.random() * bgCanvas.height;
+    }
+
+    reset() {
+        this.x = Math.random() * bgCanvas.width;
+        this.y = -50;
+        this.speed = 0.5 + Math.random() * 2; // Slower, floaty feel
+        this.size = 10 + Math.random() * 40;
+        this.type = bgPieceTypes[Math.floor(Math.random() * bgPieceTypes.length)];
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+        this.color = colors[pieces.indexOf(this.type) + 1];
+        this.opacity = 0.1 + Math.random() * 0.4;
+    }
+
+    update() {
+        this.y += this.speed;
+        this.rotation += this.rotationSpeed;
+        if (this.y > bgCanvas.height + 50) {
+            this.reset();
+        }
+    }
+
+    draw() {
+        bgContext.save();
+        bgContext.translate(this.x, this.y);
+        bgContext.rotate(this.rotation);
+        bgContext.globalAlpha = this.opacity;
+        
+        // Neon Glow for background pieces
+        bgContext.shadowBlur = 15;
+        bgContext.shadowColor = this.color;
+        bgContext.fillStyle = this.color;
+        
+        // Draw a simple square representing the piece
+        bgContext.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+        
+        bgContext.restore();
+    }
+}
+
+// Initialize background pieces
+for (let i = 0; i < 15; i++) {
+    bgPieces.push(new BgPiece());
+}
+
+let offset = 0;
+const speed = 1; // Grid speed
+
+function animateBg() {
+    // 1. Clear Background
+    bgContext.fillStyle = '#050510';
+    bgContext.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+    const w = bgCanvas.width;
+    const h = bgCanvas.height;
+    const horizon = h * 0.4;
+    const gridGap = 40;
+
+    // 2. Draw Synthwave Grid
+    bgContext.save();
+    bgContext.shadowBlur = 20;
+    bgContext.shadowColor = '#bc13fe';
+    bgContext.strokeStyle = 'rgba(188, 19, 254, 0.3)';
+    bgContext.lineWidth = 2;
+    bgContext.beginPath();
+
+    // Vertical Lines
+    const centerX = w / 2;
+    for (let x = -w; x < w * 2; x += gridGap * 2) {
+        bgContext.moveTo(x, h);
+        bgContext.lineTo(centerX, horizon);
+    }
+
+    // Horizontal Lines
+    offset = (offset + speed) % gridGap;
+    for (let z = 0; z < h; z += gridGap) {
+        const y = h - z + offset;
+        if (y < horizon) continue;
+        bgContext.moveTo(0, y);
+        bgContext.lineTo(w, y);
+    }
+    bgContext.stroke();
+    bgContext.restore();
+
+    // 3. Draw Horizon Glow
+    const gradient = bgContext.createRadialGradient(w/2, horizon, 10, w/2, horizon, 400);
+    gradient.addColorStop(0, 'rgba(0, 243, 255, 0.15)');
+    gradient.addColorStop(1, 'transparent');
+    bgContext.fillStyle = gradient;
+    bgContext.fillRect(0, 0, w, h);
+
+    // 4. Draw Falling Neon Pieces
+    bgPieces.forEach(p => {
+        p.update();
+        p.draw();
+    });
+
+    requestAnimationFrame(animateBg);
+}
+
+animateBg();
 
 function draw() {
     // Clear main canvas
@@ -251,7 +388,8 @@ function arenaSweep() {
     
     // Level up every 10 lines
     player.level = Math.floor(player.lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (player.level - 1) * 100);
+    // Faster speed curve: Start at 800ms, decrease by 100ms per level, min 50ms
+    dropInterval = Math.max(50, 800 - (player.level - 1) * 100);
 }
 
 function updateScore() {
@@ -272,7 +410,7 @@ function resetGame() {
     player.lines = 0;
     player.level = 1;
     player.next = null;
-    dropInterval = 1000;
+    dropInterval = 800;
     updateScore();
     document.getElementById('game-over-overlay').classList.remove('active');
     isGameOver = false;
@@ -345,3 +483,5 @@ document.getElementById('resume-btn').addEventListener('click', togglePause);
 // Start game
 playerReset();
 update();
+
+
