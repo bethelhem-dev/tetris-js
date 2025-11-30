@@ -2,7 +2,8 @@
 
 A modern implementation of the classic Tetris game, built entirely with vanilla HTML5, CSS3, and JavaScript.
 
-<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/dae201ef-a9c9-43ff-a236-0522120c878c" />
+<img width="750" height="550" alt="image" src="https://github.com/user-attachments/assets/dae201ef-a9c9-43ff-a236-0522120c878c" />
+
 ![Tetris JS Banner](https://via.placeholder.com/800x400/0a0a12/00f3ff?text=TETRIS+JS)
 
 
@@ -75,6 +76,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 *Built with ❤️ by bethelhem-dev*
 #
+
 
 
 
