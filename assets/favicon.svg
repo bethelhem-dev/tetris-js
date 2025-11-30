@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="44" height="44" rx="8" fill="none" stroke="#bc13fe" stroke-width="4" filter="url(#neon-glow)"/>
+  <path d="M22 22 H42 V42 H32 V32 H22 Z" fill="#00f3ff" filter="url(#neon-glow)"/>
+</svg>
