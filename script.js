@@ -31,12 +31,14 @@ const player = {
 };
 
 let dropCounter = 0;
-let dropInterval = 800;
+let dropInterval = 500;
 let lastTime = 0;
 let isPaused = false;
 let isGameOver = false;
 
 const arena = createMatrix(12, 20);
+
+let isGameRunning = false;
 
 function createMatrix(w, h) {
     const matrix = [];
@@ -100,28 +102,30 @@ function drawMatrix(matrix, offset, ctx) {
                 const px = x + offset.x;
                 const py = y + offset.y;
 
-                // 1. Strong Outer Glow
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = color;
-
-                // 2. Main Block Fill (Slightly transparent for glass effect)
-                ctx.fillStyle = color;
-                ctx.globalAlpha = 0.9;
-                ctx.fillRect(px, py, 1, 1);
-                ctx.globalAlpha = 1.0;
-
-                // 3. Inner Highlight (Top-Left) for 3D/Glass look
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.fillRect(px, py, 1, 0.1); // Top edge
-                ctx.fillRect(px, py, 0.1, 1); // Left edge
+                ctx.save();
                 
-                // 4. Inner Shadow (Bottom-Right)
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                ctx.fillRect(px, py + 0.9, 1, 0.1); // Bottom edge
-                ctx.fillRect(px + 0.9, py, 0.1, 1); // Right edge
+                // 1. Neon Glow
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = color;
+                
+                // 2. Hollow Outline (Neon Style)
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 0.1; // 2px width at scale 20
+                
+                // Draw outline slightly inside the grid cell to keep it crisp
+                ctx.strokeRect(px + 0.05, py + 0.05, 0.9, 0.9);
+                
+                // 3. Faint Inner Fill (Glass/Hollow feel)
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.15;
+                ctx.fillRect(px + 0.05, py + 0.05, 0.9, 0.9);
+                
+                // 4. Inner "Core" Highlight (Optional, adds depth)
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.globalAlpha = 0.3;
+                ctx.fillRect(px + 0.35, py + 0.35, 0.3, 0.3);
 
-                // Reset shadow
-                ctx.shadowBlur = 0;
+                ctx.restore();
             }
         });
     });
@@ -152,20 +156,22 @@ class BgPiece {
 
     reset() {
         this.x = Math.random() * bgCanvas.width;
-        this.y = -50;
-        this.speed = 0.5 + Math.random() * 2; // Slower, floaty feel
-        this.size = 10 + Math.random() * 40;
+        this.y = -150; // Start further up to hide trail start
+        this.speed = 2 + Math.random() * 4; // Faster falling speed for trail effect
         this.type = bgPieceTypes[Math.floor(Math.random() * bgPieceTypes.length)];
-        this.rotation = Math.random() * Math.PI * 2;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+        this.matrix = createPiece(this.type);
+        
+        // No rotation for the "matrix rain" style falling to match reference
+        this.rotation = 0; 
+        
         this.color = colors[pieces.indexOf(this.type) + 1];
-        this.opacity = 0.1 + Math.random() * 0.4;
+        this.opacity = 0.2 + Math.random() * 0.5; // Varied opacity
+        this.scale = 15 + Math.random() * 15; // Scale of the blocks
     }
 
     update() {
         this.y += this.speed;
-        this.rotation += this.rotationSpeed;
-        if (this.y > bgCanvas.height + 50) {
+        if (this.y > bgCanvas.height + 100) {
             this.reset();
         }
     }
@@ -173,16 +179,45 @@ class BgPiece {
     draw() {
         bgContext.save();
         bgContext.translate(this.x, this.y);
-        bgContext.rotate(this.rotation);
         bgContext.globalAlpha = this.opacity;
         
-        // Neon Glow for background pieces
-        bgContext.shadowBlur = 15;
-        bgContext.shadowColor = this.color;
-        bgContext.fillStyle = this.color;
-        
-        // Draw a simple square representing the piece
-        bgContext.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+        const blockSize = this.scale;
+        const trailLength = this.speed * 20; // Trail length proportional to speed
+
+        this.matrix.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    const px = x * blockSize;
+                    const py = y * blockSize;
+
+                    // 1. Draw Trail (Vertical gradient above the block)
+                    // We draw the trail slightly narrower than the block for a cleaner look
+                    const trailWidth = blockSize * 0.8;
+                    const trailOffset = (blockSize - trailWidth) / 2;
+                    
+                    const gradient = bgContext.createLinearGradient(0, py, 0, py - trailLength);
+                    gradient.addColorStop(0, this.color); // Bottom (at block)
+                    gradient.addColorStop(1, 'transparent'); // Top
+
+                    bgContext.fillStyle = gradient;
+                    // Draw trail centered on the block column
+                    bgContext.fillRect(px + trailOffset, py - trailLength, trailWidth, trailLength);
+
+                    // 2. Draw Block (Neon Outline)
+                    bgContext.shadowBlur = 15;
+                    bgContext.shadowColor = this.color;
+                    bgContext.strokeStyle = this.color;
+                    bgContext.lineWidth = 2;
+                    bgContext.strokeRect(px, py, blockSize, blockSize);
+
+                    // Optional: Slight inner fill for glass effect
+                    bgContext.fillStyle = this.color;
+                    bgContext.globalAlpha = this.opacity * 0.1;
+                    bgContext.fillRect(px, py, blockSize, blockSize);
+                    bgContext.globalAlpha = this.opacity; // Restore opacity
+                }
+            });
+        });
         
         bgContext.restore();
     }
@@ -250,6 +285,108 @@ function animateBg() {
 
 animateBg();
 
+// Particle System
+const particles = [];
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = (Math.random() - 0.5) * 0.5 - 0.2;
+        this.life = 1.0;
+        this.decay = 0.02 + Math.random() * 0.03;
+        this.size = 0.1 + Math.random() * 0.1;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+        this.vy += 0.01; // Gravity
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.life;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.restore();
+    }
+}
+
+function createParticles(x, y, color, amount = 5) {
+    for (let i = 0; i < amount; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        if (particles[i].life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+}
+
+function drawParticles(ctx) {
+    particles.forEach(p => p.draw(ctx));
+}
+
+// Floating Text System
+const floatingTexts = [];
+
+class FloatingText {
+    constructor(x, y, text, color = '#fff') {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.0;
+        this.vy = -0.05; // Float up
+    }
+
+    update() {
+        this.y += this.vy;
+        this.life -= 0.02;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        // Reset transform to draw text in pixel coordinates
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.life;
+        ctx.font = 'bold 24px Orbitron'; // Larger font
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.textAlign = 'center';
+        
+        // Convert grid coordinates to pixels (scale 20)
+        ctx.fillText(this.text, this.x * 20, this.y * 20);
+        
+        ctx.restore();
+    }
+}
+
+function updateFloatingTexts() {
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        floatingTexts[i].update();
+        if (floatingTexts[i].life <= 0) {
+            floatingTexts.splice(i, 1);
+        }
+    }
+}
+
+function drawFloatingTexts(ctx) {
+    floatingTexts.forEach(ft => ft.draw(ctx));
+}
+
 function draw() {
     // Clear main canvas
     context.fillStyle = '#000';
@@ -257,6 +394,8 @@ function draw() {
 
     drawMatrix(arena, {x: 0, y: 0}, context);
     drawMatrix(player.matrix, player.pos, context);
+    drawParticles(context);
+    drawFloatingTexts(context);
 }
 
 function drawNext() {
@@ -306,6 +445,16 @@ function playerDrop() {
     player.pos.y++;
     if (collide(arena, player)) {
         player.pos.y--;
+        
+        // Spawn particles on landing
+        player.matrix.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    createParticles(player.pos.x + x + 0.5, player.pos.y + y + 1, colors[value], 5);
+                }
+            });
+        });
+
         merge(arena, player);
         playerReset();
         arenaSweep();
@@ -377,19 +526,36 @@ function arenaSweep() {
             }
         }
 
+        // Spawn particles for line clear
+        for (let x = 0; x < arena[y].length; ++x) {
+             if (arena[y][x] !== 0) {
+                 createParticles(x + 0.5, y + 0.5, colors[arena[y][x]], 15);
+             }
+        }
+
         const row = arena.splice(y, 1)[0].fill(0);
         arena.unshift(row);
         ++y;
 
         player.score += rowCount * 10;
+        
+        // Floating Text Effect
+        floatingTexts.push(new FloatingText(6, y, `+${rowCount * 10}`, '#00f3ff'));
+        
+        // Score UI Pop Effect
+        const scoreElem = document.getElementById('score');
+        scoreElem.classList.remove('score-update');
+        void scoreElem.offsetWidth; // Trigger reflow
+        scoreElem.classList.add('score-update');
+
         player.lines += 1;
         rowCount *= 2;
     }
     
     // Level up every 10 lines
     player.level = Math.floor(player.lines / 10) + 1;
-    // Faster speed curve: Start at 800ms, decrease by 100ms per level, min 50ms
-    dropInterval = Math.max(50, 800 - (player.level - 1) * 100);
+    // Faster speed curve: Start at 500ms, decrease by 50ms per level, min 50ms
+    dropInterval = Math.max(50, 500 - (player.level - 1) * 50);
 }
 
 function updateScore() {
@@ -410,7 +576,7 @@ function resetGame() {
     player.lines = 0;
     player.level = 1;
     player.next = null;
-    dropInterval = 800;
+    dropInterval = 500;
     updateScore();
     document.getElementById('game-over-overlay').classList.remove('active');
     isGameOver = false;
@@ -433,7 +599,7 @@ function togglePause() {
 }
 
 function update(time = 0) {
-    if (isPaused || isGameOver) return;
+    if (isPaused || isGameOver || !isGameRunning) return;
 
     const deltaTime = time - lastTime;
     lastTime = time;
@@ -444,11 +610,13 @@ function update(time = 0) {
     }
 
     draw();
+    updateParticles();
+    updateFloatingTexts();
     requestAnimationFrame(update);
 }
 
 document.addEventListener('keydown', event => {
-    if (isGameOver) return;
+    if (isGameOver || !isGameRunning) return;
 
     if (event.keyCode === 37) { // Left
         playerMove(-1);
@@ -479,9 +647,16 @@ document.addEventListener('keydown', event => {
 // Button Event Listeners
 document.getElementById('restart-btn').addEventListener('click', resetGame);
 document.getElementById('resume-btn').addEventListener('click', togglePause);
+document.getElementById('start-btn').addEventListener('click', startGame);
 
-// Start game
-playerReset();
-update();
+function startGame() {
+    document.getElementById('start-overlay').classList.remove('active');
+    isGameRunning = true;
+    playerReset();
+    update();
+}
+
+// Initial draw (empty board)
+draw();
 
 
